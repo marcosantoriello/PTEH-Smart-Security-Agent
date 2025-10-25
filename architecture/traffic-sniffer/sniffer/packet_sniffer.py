@@ -64,32 +64,32 @@ class TrafficSniffer:
             self.logger.error(f"Error while processing the packet: {e}")
 
         
-        def start(self):
-            """Starts the capture"""
+    def start(self):
+        """Starts the capture"""
 
-            try:
-                self.logger.info("="*60)
-                self.logger.info("Traffic Sniffer started!")
-                self.logger.info(f"Interface: {self.interface}")
-                if self.filter_str:
-                    self.logger.info(f"BPF Filter: {self.filter_str}")
-                self.logger.info("="*60)
+        try:
+            self.logger.info("="*60)
+            self.logger.info("Traffic Sniffer started!")
+            self.logger.info(f"Interface: {self.interface}")
+            if self.filter_str:
+                self.logger.info(f"BPF Filter: {self.filter_str}")
+            self.logger.info("="*60)
 
-                # Starts the sniffer
-                sniff(
-                    iface=self.interface,
-                    prn=self.packet_callback,
-                    count=self.packet_count,
-                    filter=self.filter_str,
-                    store=False
-                )
+            # Starts the sniffer
+            sniff(
+                iface=self.interface,
+                prn=self.packet_callback,
+                count=self.packet_count,
+                filter=self.filter_str,
+                store=False
+            )
 
-            except  PermissionError:
-                self.logger.error("❌ Error: required root privileges")
-                sys.exit(1)
-            except Exception as e:
-                self.logger.error(f"❌ Error during sniffing: {e}")
-                sys.exit(1)
+        except  PermissionError:
+            self.logger.error("❌ Error: required root privileges")
+            sys.exit(1)
+        except Exception as e:
+            self.logger.error(f"❌ Error during sniffing: {e}")
+            sys.exit(1)
 
 
     def print_statistics(self):
