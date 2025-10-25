@@ -1,0 +1,30 @@
+services:
+  traffic-sniffer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: traffic_sniffer
+    
+    network_mode: "host"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    
+    environment:
+      - SNIFFER_INTERFACE=eth0
+      - SNIFFER_COUNT=0
+      # - SNIFFER_FILTER=tcp port 80 or tcp port 443
+    
+    # Mount log directory on the host
+    volumes:
+      - ./logs:/app/logs
+    
+    # Restart if there's an error
+    restart: unless-stopped
+    
+    # Driver Log
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
