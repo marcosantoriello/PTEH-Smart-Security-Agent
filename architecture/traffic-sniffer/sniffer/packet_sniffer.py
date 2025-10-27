@@ -3,7 +3,7 @@ Network Sniffer main module.
 It captures packets on a specified network interface.
 """
 
-from scapy.all import sniff, conf
+from scapy.all import sniff, conf, wrpcap
 from .logger_config import setup_logger
 from .packet_processor import PacketProcessor
 import signal
@@ -27,6 +27,7 @@ class TrafficSniffer:
         self.logger = setup_logger()
         self.processor = PacketProcessor(self.logger)
         self.running = True
+        self.packets_buffer = []
 
         # verbosity (0 for non-verbose, 1 for verbose)
         conf.verb = 0
@@ -59,6 +60,14 @@ class TrafficSniffer:
             log_message = self.processor.format_packet_info(packet_info)
             self.logger.info(log_message)
             self.logger.debug(f"Packet details: {packet_info}")
+
+            self.packets_buffer.append(packet)
+
+            # save every 100 packets
+            if len(self.packets_buffer) >= 100:
+                wrpcap('logs/capture.pcap', self.packets_buffer)
+                self.packets_buffer = []
+
 
         except Exception as e:
             self.logger.error(f"Error while processing the packet: {e}")
