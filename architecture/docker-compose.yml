@@ -47,6 +47,7 @@ services:
       - shared-pcap-data:/shared/pcap
       - ./feature-extractor/output:/app/output
       - ./feature-extractor/config.json:/app/config.json
+      - ./feature-extractor/logs:/app/logs
     
     restart: unless-stopped
     

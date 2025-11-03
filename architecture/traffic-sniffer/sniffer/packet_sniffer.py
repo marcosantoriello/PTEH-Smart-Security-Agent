@@ -12,23 +12,6 @@ import sys
 import requests
 
 
-def notify_feature_extraction(filename, base_url='http://feature_extractor:5000'):
-    """
-    Notifies the feature extractor that a new pcap has been saved and 
-    sends the path to this new file.
-    """
-    path = f"/shared/pcap/{filename}"
-    data = {'filename': filename, 'path': path}
-
-    try:
-        r = requests.post(f"{base_url}/new_pcap", json=data)
-        if r.status_code == 200:
-            print(f"Notification sent: {filename}")
-        else:
-            print(f"There was an error sending the notification: {r.text}")
-    except Exception as e:
-        print(f"API call error: {e}")
-
 class TrafficSniffer:
 
     def __init__(self, interface='eth0', packet_count=0, filter_str=None, batch_size=100):
@@ -64,6 +47,23 @@ class TrafficSniffer:
         self.running = False
         self.print_statistics()
         sys.exit(0)
+
+    def notify_feature_extraction(self, filename, base_url='http://feature_extractor:5000'):
+        """
+        Notifies the feature extractor that a new pcap has been saved and 
+        sends the path to this new file.
+        """
+        path = f"/shared/pcap/{filename}"
+        data = {'filename': filename, 'path': path}
+
+        try:
+            r = requests.post(f"{base_url}/new_pcap", json=data)
+            if r.status_code == 200:
+                self.logger.info(f"Notification sent successfully for file: {filename}")
+            else:
+                self.logger.error(f"Failed to send notification for {filename}: {response.text}")
+        except Exception as e:
+            self.logger.error(f"API call error while notifying feature extractor for {filename}: {e}")
 
     
     def packet_callback(self, packet):

@@ -22,6 +22,6 @@ WORKDIR /app
 COPY extractor.py .
 COPY config.json .
 
-RUN mkdir -p /app/input /app/output
+RUN mkdir -p /app/input /app/output /app/logs
 
 CMD ["python", "extractor.py"]
