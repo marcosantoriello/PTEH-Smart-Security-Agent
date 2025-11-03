@@ -19,7 +19,7 @@ RUN pip install .
 
 WORKDIR /app
 
-COPY run_extractor.py .
+COPY extractor.py .
 COPY config.json .
 
 RUN mkdir -p /app/input /app/output
