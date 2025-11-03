@@ -21,4 +21,4 @@ COPY config.json .
 
 RUN mkdir -p /app/input /app/output
 
-CMD ["python", "run_extractor.py"]
+CMD ["python", "extractor.py"]

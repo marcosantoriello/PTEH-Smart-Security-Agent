@@ -16,6 +16,7 @@ services:
     
     volumes:
       - ./traffic-sniffer/logs:/app/logs
+      - shared-pcap-data:/shared/pcap
     
     restart: unless-stopped
     
@@ -43,7 +44,7 @@ services:
       # - PCAP_INPUT=/app/input/capture.pcap
     
     volumes:
-      - ./feature-extractor/input:/app/input
+      - shared-pcap-data:/shared/pcap
       - ./feature-extractor/output:/app/output
       - ./feature-extractor/config.json:/app/config.json
     
@@ -54,3 +55,6 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
+        
+volumes:
+  shared-pcap-data:
