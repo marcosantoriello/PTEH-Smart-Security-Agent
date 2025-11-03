@@ -11,56 +11,46 @@ services:
       - NET_RAW
     
     environment:
-      - SNIFFER_INTERFACE=eth0
+      - SNIFFER_INTERFACE=docker0
       - SNIFFER_COUNT=0
-      # - SNIFFER_FILTER=tcp port 80 or tcp port 443
     
-    # Mount log directory on the host
     volumes:
       - ./traffic-sniffer/logs:/app/logs
     
-    # Restart if there's an error
     restart: unless-stopped
     
-    # Driver Log
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-
   feature-extractor:
     build:
       context: ./feature-extractor
       dockerfile: Dockerfile
     container_name: feature_extractor
-
-  network_mode: "host"
+    
+    network_mode: "host"
     cap_add:
       - NET_ADMIN
       - NET_RAW
-
-  environment:
+    
+    environment:
       - FLOW_TIMEOUT=120
       - ACTIVITY_TIMEOUT=5
-      - INTERFACE=eth0
-      # - PCAP_INPUT=/app/input/capture.pcap  # Opzionale per input statico
-
-  volumes:
-      - ./feature-extractor/input:/app/input     # PCAP input
-      - ./feature-extractor/output:/app/output   # CSV e log output
+      - INTERFACE=docker0
+      # - PCAP_INPUT=/app/input/capture.pcap
+    
+    volumes:
+      - ./feature-extractor/input:/app/input
+      - ./feature-extractor/output:/app/output
       - ./feature-extractor/config.json:/app/config.json
-
-  restart: unless-stopped
+    
+    restart: unless-stopped
     
     logging:
       driver: "json-file"
       options:
         max-size: "5m"
         max-file: "2"
-
-volumes:
-  # Optional named volumes se vuoi persistere dati separatamente
-  pcap-data:
-  features-data:
