@@ -1,3 +1,7 @@
 .DS_Store
 
 /dataset
+
+# output files of the components
+/architecture/feature-extractor/output
+/architecture/traffic-sniffer/logs
