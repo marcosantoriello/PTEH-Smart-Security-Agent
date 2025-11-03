@@ -3,6 +3,7 @@ Network Sniffer main module.
 It captures packets on a specified network interface.
 """
 
+import datetime
 from scapy.all import sniff, conf, wrpcap
 from .logger_config import setup_logger
 from .packet_processor import PacketProcessor
@@ -30,7 +31,7 @@ def notify_feature_extraction(filename, base_url='http://feature_extractor:5000'
 
 class TrafficSniffer:
 
-    def __init__(self, interface='eth0', packet_count=0, filter_str=None):
+    def __init__(self, interface='eth0', packet_count=0, filter_str=None, batch_size=100):
         """
         Initialise the sniffer.
         
@@ -43,6 +44,7 @@ class TrafficSniffer:
         self.interface = interface
         self.packet_count = packet_count
         self.filter_str = filter_str
+        self.batch_size = batch_size
         self.logger = setup_logger()
         self.processor = PacketProcessor(self.logger)
         self.running = True
@@ -83,9 +85,15 @@ class TrafficSniffer:
             self.packets_buffer.append(packet)
 
             # save every 100 packets
-            if len(self.packets_buffer) >= 100:
-                wrpcap('logs/capture.pcap', self.packets_buffer)
-                notify_feature_extraction()
+            if len(self.packets_buffer) >= self.batch_size:
+                # generates filename with timestamp
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"capture_{timestamp}.pcap"
+                filepath = f"/shared/pcap/{filename}"
+
+                wrpcap(filepath, self.packets_buffer)
+                notify_feature_extraction(filename)
+
                 self.packets_buffer = []
 
 
