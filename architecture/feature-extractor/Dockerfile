@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY libs/NTLFlowLyzer ./libs/NTLFlowLyzer
 
 WORKDIR /app/libs/NTLFlowLyzer
@@ -16,9 +19,9 @@ RUN pip install .
 
 WORKDIR /app
 
-COPY run_extractor.py .
+COPY extractor.py .
 COPY config.json .
 
-RUN mkdir -p /app/input /app/output
+RUN mkdir -p /app/input /app/output /app/logs
 
-CMD ["python", "run_extractor.py"]
+CMD ["python", "extractor.py"]

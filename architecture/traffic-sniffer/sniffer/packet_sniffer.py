@@ -3,15 +3,18 @@ Network Sniffer main module.
 It captures packets on a specified network interface.
 """
 
+import datetime
 from scapy.all import sniff, conf, wrpcap
 from .logger_config import setup_logger
 from .packet_processor import PacketProcessor
 import signal
 import sys
+import requests
+
 
 class TrafficSniffer:
 
-    def __init__(self, interface='eth0', packet_count=0, filter_str=None):
+    def __init__(self, interface='eth0', packet_count=0, filter_str=None, batch_size=100):
         """
         Initialise the sniffer.
         
@@ -24,6 +27,7 @@ class TrafficSniffer:
         self.interface = interface
         self.packet_count = packet_count
         self.filter_str = filter_str
+        self.batch_size = batch_size
         self.logger = setup_logger()
         self.processor = PacketProcessor(self.logger)
         self.running = True
@@ -43,6 +47,23 @@ class TrafficSniffer:
         self.running = False
         self.print_statistics()
         sys.exit(0)
+
+    def notify_feature_extraction(self, filename, base_url='http://localhost:5000'):
+        """
+        Notifies the feature extractor that a new pcap has been saved and 
+        sends the path to this new file.
+        """
+        path = f"/shared/pcap/{filename}"
+        data = {'filename': filename, 'path': path}
+
+        try:
+            r = requests.post(f"{base_url}/new_pcap", json=data)
+            if r.status_code == 200:
+                self.logger.info(f"Notification sent successfully for file: {filename}")
+            else:
+                self.logger.error(f"Failed to send notification for {filename}: {r.text}")
+        except Exception as e:
+            self.logger.error(f"API call error while notifying feature extractor for {filename}: {e}")
 
     
     def packet_callback(self, packet):
@@ -64,8 +85,15 @@ class TrafficSniffer:
             self.packets_buffer.append(packet)
 
             # save every 100 packets
-            if len(self.packets_buffer) >= 100:
-                wrpcap('logs/capture.pcap', self.packets_buffer)
+            if len(self.packets_buffer) >= self.batch_size:
+                # generates filename with timestamp
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"capture_{timestamp}.pcap"
+                filepath = f"/shared/pcap/{filename}"
+
+                wrpcap(filepath, self.packets_buffer)
+                self.notify_feature_extraction(filename)
+
                 self.packets_buffer = []
 
 
@@ -104,8 +132,8 @@ class TrafficSniffer:
     def print_statistics(self):
         """Prints final stats"""
         self.logger.info("="*60)
-        self.logger.info("📊 Statistiche finali:")
-        self.logger.info(f"   Pacchetti catturati: {self.processor.packet_count}")
+        self.logger.info("📊 Final stats:")
+        self.logger.info(f"   Captured packets: {self.processor.packet_count}")
         self.logger.info("="*60)
 
     
