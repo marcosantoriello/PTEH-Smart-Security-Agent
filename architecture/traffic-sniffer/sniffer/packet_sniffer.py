@@ -5,11 +5,16 @@ It captures packets on a specified network interface.
 
 import datetime
 from scapy.all import sniff, conf, wrpcap
-from .logger_config import setup_logger
 from .packet_processor import PacketProcessor
 import signal
 import sys
 import requests
+import os
+import sys
+
+# Add parent directory to path for utils import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from utils import get_logger
 
 
 class TrafficSniffer:
@@ -28,7 +33,7 @@ class TrafficSniffer:
         self.packet_count = packet_count
         self.filter_str = filter_str
         self.batch_size = batch_size
-        self.logger = setup_logger()
+        self.logger = get_logger('PacketSniffer')
         self.processor = PacketProcessor(self.logger)
         self.running = True
         self.packets_buffer = []

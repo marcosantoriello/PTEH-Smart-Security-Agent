@@ -3,29 +3,18 @@ import os
 import subprocess
 import tempfile
 import threading
-import logging
 import redis
 from flask import Flask, request, jsonify
 from datetime import datetime
+from utils import get_logger
 
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
-
 app = Flask(__name__)
-
-# Logger config
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("feature_extractor.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+logger = get_logger('feature_extractor')
 
 def extract_traffic_features(pcap_path, base_config_path="config.json"):
     """
