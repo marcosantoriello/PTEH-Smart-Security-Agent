@@ -70,6 +70,36 @@ services:
       options:
         max-size: "5m"
         max-file: "2"
+  
+  ids:
+    build:
+      context: ./ids
+      dockerfile: Dockerfile
+    container_name: ids
+
+    network_mode: "host"
+
+    environment:
+      - REDIS_HOST=localhost
+      - REDIST_PORT=6379
+      - POLLING_INTERVAL=10
+
+    depends_on:
+      - redis
+      - feature_extractor
+
+    volumes:
+      - ../notebook/models/v1:/app/model
+      - ./ids/logs:/app/logs
+
+    restart: unless_stopped
+
+    logging:
+      driver: "json_file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
         
 volumes:
   shared-pcap-data:
