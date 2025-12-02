@@ -1,14 +1,9 @@
+import io
 import os
 import joblib
 import redis
 from utils import get_logger
-
-redis_client = None
-timestamp = None
-logger = None
-model = None
-scaler = None
-feature_names = None
+import pandas as pd
 
 
 class Ids:
@@ -64,7 +59,7 @@ class Ids:
             self.redis_client.ping()
             self.logger.info(f"Successfully connected to Redis at {self.REDIS_HOST}:{self.REDIS_PORT}")
 
-            last_processed = redis_client.zrevrange("features_index", 0, 0, withscores=True)
+            last_processed = self.redis_client.zrevrange("features_index", 0, 0, withscores=True)
 
             if not last_processed:
                 self.last_processed_timestamp = None
@@ -96,14 +91,46 @@ class Ids:
 
     
 
-    def _get_new_files():
+    def _get_new_files(self):
         """
             Retrieve new files from Redis in batches and merge them.
 
             Returns:
                 pandas.DataFrame: a DataFrame containing the combined data from the new files.
         """
+        retrieved_file_keys = self._get_new_files_keys()
 
+        if not retrieved_file_keys:
+            self.logger.info("No new files to retrieve")
+
+        dataframes = []
+
+        for key in retrieved_file_keys:
+            try:
+                csv_content = self.redis_client.get(key)
+
+                if csv_content is None:
+                    self.logger.warning(f"Key {key} exists in index but has no content.")
+                    continue
+                
+                df = pd.read_csv(io.StringIO(csv_content))
+                dataframes.append(df)
+                self.logger.info(f"Loaded {len(df)} rows from {key}")
+            
+            except Exception as e:
+                self.logger.error(f"Failed to load {key}: {e}. Skipping this file")
+                continue
+        
+        if not dataframes:
+            self.logger.warning("No valid files were loaded")
+            return None
+        
+        combined_df = pd.concat(dataframes, ignore_index=True)
+        self.logger.info(f"Successfully merged {len(dataframes)} file(s) into DataFrame with {len(combined_df)} rows")
+        
+        return combined_df
+            
+        
 
     def _get_new_files_keys(self):
         """
@@ -127,7 +154,7 @@ class Ids:
             self.logger.info(f"Found {len(file_keys)} new file(s)")
             return file_keys
         except Exception as e:
-            self.logger.error(f"Failed to retrieve new files: {e}")
+            self.logger.error(f"Failed to retrieve new files keys: {e}")
             return []
         
     
