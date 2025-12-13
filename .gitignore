@@ -1,7 +1,10 @@
 .DS_Store
-
+__pycache__/
 /dataset
 
 # output files of the components
 /architecture/feature-extractor/output
 **/logs
+
+# temp utility files
+**/temp-utils
