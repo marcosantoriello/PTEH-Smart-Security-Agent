@@ -4,6 +4,8 @@ import joblib
 import redis
 from utils import get_logger
 import pandas as pd
+import numpy as np
+import time
 
 
 class Ids:
@@ -21,6 +23,7 @@ class Ids:
         self.model = None
         self.scaler = None
         self.feature_names = None
+        self.label_encoder = None
 
         self.logger = get_logger('IDS')
 
@@ -76,7 +79,7 @@ class Ids:
         """"
             Load model, scaler and feature_names from pickle file
         """
-        self.logger.info("Loading model, scaler and feature names...")
+        self.logger.info("Loading model, scaler, feature names and encoder...")
         try:
             with open(self.MODEL_PATH, 'rb') as f:
                 model_package = joblib.load(f)
@@ -84,7 +87,8 @@ class Ids:
                 self.model = model_package['model']
                 self.scaler = model_package['scaler']
                 self.feature_names = model_package['feature_names']
-
+                self.label_encoder = model_package['label_encoder']
+                
                 self.logger.info(f"Model package loaded from {self.MODEL_PATH}")
         except Exception as e:
             self.logger.error(f"Failed to load model package: {e}")
@@ -102,6 +106,7 @@ class Ids:
 
         if not retrieved_file_keys:
             self.logger.info("No new files to retrieve")
+            return None
 
         dataframes = []
 
@@ -157,6 +162,143 @@ class Ids:
             self.logger.error(f"Failed to retrieve new files keys: {e}")
             return []
         
+    def _preprocess(self, df):
+        """
+        Preprocess data using pre-trained encoder and scaler.
+        """
+        if df is None:
+            self.logger.warning("Preprocess called with df=None. Skipping.")
+            return None
+        try:
+            self.logger.info(f"Starting preprocessing of {len(df)} rows...")
+            
+            df_clean = df.copy()
+
+            # Rename columns for NTLFlowLyzer compatibility
+            column_mapping = {
+                'fwd_segment_size_mean': 'fwd_avg_segment_size',
+                'bwd_segment_size_mean': 'bwd_avg_segment_size',
+                'segment_size_mean': 'avg_segment_size',
+            }
+
+            columns_to_rename = {k: v for k, v in column_mapping.items() if k in df_clean.columns}
+            if columns_to_rename:
+                df_clean.rename(columns=columns_to_rename, inplace=True)
+                self.logger.info(f"Renamed {len(columns_to_rename)} column(s) for compatibility: {list(columns_to_rename.values())}")
+            
+            # Handle infinite values
+            inf_count = np.isinf(df_clean.select_dtypes(include=[np.number])).sum().sum()
+            if inf_count > 0:
+                self.logger.warning(f"Found {inf_count} infinite values, replacing with NaN")
+                df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
+            
+            # Label Encoding for 'protocol'
+            if 'protocol' in df_clean.columns:
+                if df_clean['protocol'].dtype == 'object':
+                    self.logger.info("Encoding 'protocol' column...")
+
+                    try:
+                        df_clean['protocol'] = self.label_encoder.transform(df_clean['protocol'].astype(str))
+                        self.logger.debug(f"Protocol encoded successfully")
+                        
+                    except ValueError as e:
+                        self.logger.error(f"Unknown protocol value encountered: {e}")
+                        self.logger.info(f"Known protocols: {self.label_encoder.classes_}")
+                        
+                        # Handle unknown values
+                        df_clean['protocol'] = df_clean['protocol'].apply(
+                            lambda x: self._encode_protocol_safe(x)
+                        )
+            
+            float_cols = df_clean.select_dtypes(include=['float64', 'float32']).columns
+            if len(float_cols) > 0:
+                df_clean[float_cols] = df_clean[float_cols].round(4)
+            
+            # Feature selection
+            try:
+                df_features = df_clean[self.feature_names]
+            except KeyError as e:
+                missing = set(self.feature_names) - set(df_clean.columns)
+                self.logger.error(f"Missing required features: {missing}")
+                raise
+            
+            # Check NaN
+            nan_count = df_features.isnull().sum().sum()
+            if nan_count > 0:
+                self.logger.warning(f"Found {nan_count} NaN values in features")
+            
+            #
+            X_scaled = self.scaler.transform(df_features)
+            
+            self.logger.info(f"Preprocessing completed: {X_scaled.shape}")
+            
+            return X_scaled, df_clean
+        
+        except Exception as e:
+            self.logger.error(f"Preprocessing failed: {e}")
+            raise
+
+
+    def _encode_protocol_safe(self, value):
+        """
+        Encode a protocol value safely, handling unknown values.
+        
+        Args:
+            value: Protocol value to encode
+        
+        Returns:
+            int: Encoded value or -1 if unknown
+        """
+        try:
+            return self.label_encoder.transform([str(value)])[0]
+        except ValueError:
+            self.logger.warning(f"Unknown protocol '{value}', using default (-1)")
+            return -1
+        
+    
+    def _update_last_processed_timestamp(self):
+        """
+        TESTING ONLY - TO REMOVE
+        Updates last_processed_timestamp to the most recent file in features_index.
+        
+        TODO: Remove this after testing
+        """
+        try:
+            latest = self.redis_client.zrevrange("features_index", 0, 0, withscores=True)
+            
+            if latest:
+                latest_key, latest_timestamp = latest[0]
+                self.last_processed_timestamp = latest_timestamp
+                self.logger.info(f"[TESTING] Updated last_processed_timestamp to {latest_timestamp} (key: {latest_key})")
+            else:
+                self.logger.warning("[TESTING] No files found in features_index to update timestamp")
+                
+        except Exception as e:
+            self.logger.error(f"[TESTING] Failed to update timestamp: {e}")
+
+
+        
+
+
+if __name__ == "__main__":
+    ids = Ids()
+    ids.setup()
+
+    while True:
+        df = ids._get_new_files()
+
+        if df is None:
+            ids.logger.info("No data to preprocess.")
+        else:
+            ids.logger.info("=== STARTING PREPROCESS ===")
+            ids._preprocess(df)
+
+            # TODO: REMOVE 
+            ids._update_last_processed_timestamp()
+
+        ids.logger.info(f"Sleeping for {ids.POLLING_INTERVAL} seconds...")
+        time.sleep(ids.POLLING_INTERVAL)
+
     
     
     
