@@ -174,17 +174,6 @@ class Ids:
             
             df_clean = df.copy()
 
-            # Rename columns for NTLFlowLyzer compatibility
-            column_mapping = {
-                'fwd_segment_size_mean': 'fwd_avg_segment_size',
-                'bwd_segment_size_mean': 'bwd_avg_segment_size',
-                'segment_size_mean': 'avg_segment_size',
-            }
-
-            columns_to_rename = {k: v for k, v in column_mapping.items() if k in df_clean.columns}
-            if columns_to_rename:
-                df_clean.rename(columns=columns_to_rename, inplace=True)
-                self.logger.info(f"Renamed {len(columns_to_rename)} column(s) for compatibility: {list(columns_to_rename.values())}")
             
             # Handle infinite values
             inf_count = np.isinf(df_clean.select_dtypes(include=[np.number])).sum().sum()
