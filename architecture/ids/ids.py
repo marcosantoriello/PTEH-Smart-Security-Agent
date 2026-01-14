@@ -174,7 +174,6 @@ class Ids:
             
             df_clean = df.copy()
 
-            
             # Handle infinite values
             inf_count = np.isinf(df_clean.select_dtypes(include=[np.number])).sum().sum()
             if inf_count > 0:
@@ -243,29 +242,133 @@ class Ids:
         except ValueError:
             self.logger.warning(f"Unknown protocol '{value}', using default (-1)")
             return -1
-        
-    
-    def _update_last_processed_timestamp(self):
+
+
+    def _predict(self, X_scaled, df_original):
         """
-        TESTING ONLY - TO REMOVE
-        Updates last_processed_timestamp to the most recent file in features_index.
+        Run model prediction and attach metadata for firewall rules.
         
-        TODO: Remove this after testing
-        """
-        try:
-            latest = self.redis_client.zrevrange("features_index", 0, 0, withscores=True)
+        Args:
+            X_scaled: Preprocessed and scaled features
+            df_original: Original dataframe with metadata columns
             
-            if latest:
-                latest_key, latest_timestamp = latest[0]
-                self.last_processed_timestamp = latest_timestamp
-                self.logger.info(f"[TESTING] Updated last_processed_timestamp to {latest_timestamp} (key: {latest_key})")
-            else:
-                self.logger.warning("[TESTING] No files found in features_index to update timestamp")
-                
+        Returns:
+            pandas.DataFrame: Predictions with metadata (src_ip, src_port, dst_ip, dst_port, protocol, etc.)
+        """
+        if X_scaled is None or df_original is None:
+            self.logger.warning("Predict called with None input. Skipping.")
+            return None
+        
+        try:
+            self.logger.info(f"Starting prediction for {X_scaled.shape[0]} flows...")
+            predictions = self.model.predict(X_scaled)
+            prediction_proba = self.model.predict_proba(X_scaled)
+            
+            # Extract metadata columns for firewall rules
+            metadata_cols = ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'protocol']
+            metadata = df_original[metadata_cols].copy() if all(col in df_original.columns for col in metadata_cols) else pd.DataFrame()
+            
+            results = pd.DataFrame({
+                'prediction': predictions,
+                'confidence': prediction_proba.max(axis=1),
+                'timestamp': pd.Timestamp.now()
+            })
+            
+            # Attach metadata
+            if not metadata.empty:
+                results = pd.concat([metadata.reset_index(drop=True), results], axis=1)
+            
+            attack_count = (predictions == 1).sum()
+            benign_count = (predictions == 0).sum()
+            
+            self.logger.info(f"Prediction completed: {attack_count} attacks, {benign_count} benign flows")
+            self.logger.info(f"Average confidence: {results['confidence'].mean():.3f}")
+            
+            return results
+        
         except Exception as e:
-            self.logger.error(f"[TESTING] Failed to update timestamp: {e}")
+            self.logger.error(f"Prediction failed: {e}")
+            raise
 
 
+    def _update_last_processed_timestamp(self, file_keys):
+        """
+        Update the last processed timestamp after successful processing.
+        
+        Args:
+            file_keys: List of processed Redis keys
+        """
+        if not file_keys:
+            return
+        
+        try:
+            # Get highest timestamp from processed files
+            scores = self.redis_client.zmscore("features_index", file_keys)
+            max_timestamp = max(float(s) for s in scores if s is not None)
+            
+            self.last_processed_timestamp = max_timestamp
+            self.logger.info(f"Updated last processed timestamp to {max_timestamp}")
+        
+        except Exception as e:
+            self.logger.error(f"Failed to update timestamp: {e}")
+
+
+
+    def _save_predictions(self, predictions_df):
+        """
+        Save predictions to Redis for downstream analysis.
+        
+        Args:
+            predictions_df: DataFrame with predictions and metadata
+        """
+        if predictions_df is None or predictions_df.empty:
+            self.logger.warning("No predictions to save")
+            return
+        
+        try:
+            timestamp = int(time.time())
+            redis_key = f"predictions:{timestamp}"
+            
+            # Save as JSON for easy parsing
+            predictions_json = predictions_df.to_json(orient='records')
+            self.redis_client.set(redis_key, predictions_json)
+            
+            # Add to sorted set for retrieval
+            self.redis_client.zadd("predictions_index", {redis_key: timestamp})
+            
+            # Save attack flows separately for immediate firewall action
+            attack_flows = predictions_df[predictions_df['prediction'] == 1]
+            if not attack_flows.empty:
+                attack_key = f"attacks:{timestamp}"
+                self.redis_client.set(attack_key, attack_flows.to_json(orient='records'))
+                self.redis_client.zadd("attacks_index", {attack_key: timestamp})
+                self.logger.warning(f"Detected {len(attack_flows)} ATTACK flows - saved to {attack_key}")
+            
+            self.logger.info(f"Saved {len(predictions_df)} predictions to Redis: {redis_key}")
+        
+        except Exception as e:
+            self.logger.error(f"Failed to save predictions: {e}")
+
+    def _update_last_processed_timestamp(self, file_keys):
+        """
+        Update the last processed timestamp after successful processing.
+        
+        Args:
+            file_keys: List of processed Redis keys
+        """
+        if not file_keys:
+            return
+        
+        try:
+            # Get highest timestamp from processed files
+            scores = self.redis_client.zmscore("features_index", file_keys)
+            max_timestamp = max(float(s) for s in scores if s is not None)
+            
+            self.last_processed_timestamp = max_timestamp
+            self.logger.info(f"Updated last processed timestamp to {max_timestamp}")
+        
+        except Exception as e:
+            self.logger.error(f"Failed to update timestamp: {e}")
         
 
 
@@ -274,17 +377,27 @@ if __name__ == "__main__":
     ids.setup()
 
     while True:
-        df = ids._get_new_files()
+        try:
+            df = ids._get_new_files()
 
-        if df is None:
-            ids.logger.info("No data to preprocess.")
-        else:
-            ids.logger.info("=== STARTING PREPROCESS ===")
-            ids._preprocess(df)
+            if df is None:
+                ids.logger.info("No data to preprocess.")
+            else:
+                ids.logger.info("=== STARTING PREPROCESS ===")
+                X_scaled, df_clean = ids._preprocess(df)
 
-            # TODO: REMOVE 
-            ids._update_last_processed_timestamp()
+                ids.logger.info("=== STARTING PREDICTION ===")
+                predictions = ids._predict(X_scaled, df_clean)
 
+                ids._save_predictions(predictions)
+                file_keys = ids._get_new_files_keys()
+                ids._update_last_processed_timestamp(file_keys)
+
+        
+        except Exception as e:
+            ids.logger.error(f"Error in main loop: {e}")
+
+        
         ids.logger.info(f"Sleeping for {ids.POLLING_INTERVAL} seconds...")
         time.sleep(ids.POLLING_INTERVAL)
 
