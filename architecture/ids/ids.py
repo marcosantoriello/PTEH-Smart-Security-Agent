@@ -52,7 +52,7 @@ class Ids:
         """
             Connect to Redis and retrieve last timestamp (if any)
         """
-        self.logger.info("Connecting to Reids and retrieving last timestamp (if any)...")
+        self.logger.info("Connecting to Redis and retrieving last timestamp (if any)...")
         try:
             self.redis_client = redis.Redis(
                 host=self.REDIS_HOST, 
@@ -348,27 +348,6 @@ class Ids:
         
         except Exception as e:
             self.logger.error(f"Failed to save predictions: {e}")
-
-    def _update_last_processed_timestamp(self, file_keys):
-        """
-        Update the last processed timestamp after successful processing.
-        
-        Args:
-            file_keys: List of processed Redis keys
-        """
-        if not file_keys:
-            return
-        
-        try:
-            # Get highest timestamp from processed files
-            scores = self.redis_client.zmscore("features_index", file_keys)
-            max_timestamp = max(float(s) for s in scores if s is not None)
-            
-            self.last_processed_timestamp = max_timestamp
-            self.logger.info(f"Updated last processed timestamp to {max_timestamp}")
-        
-        except Exception as e:
-            self.logger.error(f"Failed to update timestamp: {e}")
         
 
 
