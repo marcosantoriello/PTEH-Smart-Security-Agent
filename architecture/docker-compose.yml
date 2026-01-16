@@ -91,7 +91,7 @@ services:
       - feature-extractor
 
     volumes:
-      - ../notebook/models/v1/rf_ids_binary_model.pkl:/app/model/model.pkl
+      - ../notebook/models/v2/ids_model.joblib:/app/model/model.joblib
       - ./ids/logs:/app/logs
       - ./utils:/app/utils
 

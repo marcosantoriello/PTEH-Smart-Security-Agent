@@ -9,7 +9,7 @@ import time
 
 
 class Ids:
-    def __init__(self, model_path='model/model.pkl'):
+    def __init__(self, model_path='model/model.joblib'):
         """
             Initialize IDS class
         """
@@ -22,8 +22,9 @@ class Ids:
         self.last_processed_timestamp = None
         self.model = None
         self.scaler = None
-        self.feature_names = None
         self.label_encoder = None
+        self.feature_names = None
+        self.protocol_encoder = None
 
         self.logger = get_logger('IDS')
 
@@ -79,15 +80,16 @@ class Ids:
         """"
             Load model, scaler and feature_names from pickle file
         """
-        self.logger.info("Loading model, scaler, feature names and encoder...")
+        self.logger.info("Loading model, scaler, feature names, label encoder and protocol encoder...")
         try:
             with open(self.MODEL_PATH, 'rb') as f:
                 model_package = joblib.load(f)
 
                 self.model = model_package['model']
                 self.scaler = model_package['scaler']
-                self.feature_names = model_package['feature_names']
                 self.label_encoder = model_package['label_encoder']
+                self.feature_names = model_package['selected_features']
+                self.protocol_encoder = model_package['protocol_encoder']
                 
                 self.logger.info(f"Model package loaded from {self.MODEL_PATH}")
         except Exception as e:
@@ -180,18 +182,19 @@ class Ids:
                 self.logger.warning(f"Found {inf_count} infinite values, replacing with NaN")
                 df_clean.replace([np.inf, -np.inf], np.nan, inplace=True)
             
-            # Label Encoding for 'protocol'
+            # Label Encoding for 'protocol' using the specific protocol_encoder
             if 'protocol' in df_clean.columns:
                 if df_clean['protocol'].dtype == 'object':
-                    self.logger.info("Encoding 'protocol' column...")
+                    self.logger.info("Encoding 'protocol' column using protocol_encoder...")
 
                     try:
-                        df_clean['protocol'] = self.label_encoder.transform(df_clean['protocol'].astype(str))
+                        # Use the specific protocol encoder provided in the model package
+                        df_clean['protocol'] = self.protocol_encoder.transform(df_clean['protocol'].astype(str))
                         self.logger.debug(f"Protocol encoded successfully")
                         
                     except ValueError as e:
                         self.logger.error(f"Unknown protocol value encountered: {e}")
-                        self.logger.info(f"Known protocols: {self.label_encoder.classes_}")
+                        self.logger.info(f"Known protocols: {self.protocol_encoder.classes_}")
                         
                         # Handle unknown values
                         df_clean['protocol'] = df_clean['protocol'].apply(
@@ -215,7 +218,7 @@ class Ids:
             if nan_count > 0:
                 self.logger.warning(f"Found {nan_count} NaN values in features")
             
-            #
+            # Scale features
             X_scaled = self.scaler.transform(df_features)
             
             self.logger.info(f"Preprocessing completed: {X_scaled.shape}")
@@ -238,7 +241,7 @@ class Ids:
             int: Encoded value or -1 if unknown
         """
         try:
-            return self.label_encoder.transform([str(value)])[0]
+            return self.protocol_encoder.transform([str(value)])[0]
         except ValueError:
             self.logger.warning(f"Unknown protocol '{value}', using default (-1)")
             return -1
@@ -268,8 +271,12 @@ class Ids:
             metadata_cols = ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'protocol']
             metadata = df_original[metadata_cols].copy() if all(col in df_original.columns for col in metadata_cols) else pd.DataFrame()
             
+            # Map predictions to labels
+            predicted_labels = self.label_encoder.inverse_transform(predictions)
+            
             results = pd.DataFrame({
-                'prediction': predictions,
+                'prediction_id': predictions,
+                'prediction': predicted_labels,
                 'confidence': prediction_proba.max(axis=1),
                 'timestamp': pd.Timestamp.now()
             })
@@ -278,8 +285,8 @@ class Ids:
             if not metadata.empty:
                 results = pd.concat([metadata.reset_index(drop=True), results], axis=1)
             
-            attack_count = (predictions == 1).sum()
-            benign_count = (predictions == 0).sum()
+            attack_count = (predicted_labels != 'Benign').sum()
+            benign_count = (predicted_labels == 'Benign').sum()
             
             self.logger.info(f"Prediction completed: {attack_count} attacks, {benign_count} benign flows")
             self.logger.info(f"Average confidence: {results['confidence'].mean():.3f}")
@@ -337,7 +344,7 @@ class Ids:
             self.redis_client.zadd("predictions_index", {redis_key: timestamp})
             
             # Save attack flows separately for immediate firewall action
-            attack_flows = predictions_df[predictions_df['prediction'] == 1]
+            attack_flows = predictions_df[predictions_df['prediction'] != 'Benign']
             if not attack_flows.empty:
                 attack_key = f"attacks:{timestamp}"
                 self.redis_client.set(attack_key, attack_flows.to_json(orient='records'))
