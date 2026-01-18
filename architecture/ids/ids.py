@@ -221,6 +221,9 @@ class Ids:
             # Scale features
             X_scaled = self.scaler.transform(df_features)
             
+            # Convert back to DataFrame to preserve feature names for model prediction
+            X_scaled = pd.DataFrame(X_scaled, columns=self.feature_names, index=df_features.index)
+            
             self.logger.info(f"Preprocessing completed: {X_scaled.shape}")
             
             return X_scaled, df_clean

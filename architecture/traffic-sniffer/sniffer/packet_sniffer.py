@@ -32,6 +32,7 @@ class TrafficSniffer:
         self.packet_count = packet_count
         self.filter_str = filter_str
         self.batch_size = batch_size
+        self.feature_extractor_url = os.getenv('FEATURE_EXTRACTOR_URL', 'http://172.21.0.3:5000')
         self.logger = get_logger('PacketSniffer')
         self.processor = PacketProcessor(self.logger)
         self.running = True
@@ -52,7 +53,7 @@ class TrafficSniffer:
         self.print_statistics()
         sys.exit(0)
 
-    def notify_feature_extraction(self, filename, base_url='http://localhost:5000'):
+    def notify_feature_extraction(self, filename):
         """
         Notifies the feature extractor that a new pcap has been saved and 
         sends the path to this new file.
@@ -61,7 +62,7 @@ class TrafficSniffer:
         data = {'filename': filename, 'path': path}
 
         try:
-            r = requests.post(f"{base_url}/new_pcap", json=data)
+            r = requests.post(f"{self.feature_extractor_url}/new_pcap", json=data)
             if r.status_code == 200:
                 self.logger.info(f"Notification sent successfully for file: {filename}")
             else:

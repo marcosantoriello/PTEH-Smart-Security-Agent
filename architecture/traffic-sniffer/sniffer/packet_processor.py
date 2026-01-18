@@ -64,7 +64,7 @@ class PacketProcessor:
                 packet_info['src_port'] = udp_layer.sport
                 packet_info['dst_port'] = udp_layer.dport
 
-            elif packet.hasLayer(ICMP):
+            elif packet.haslayer(ICMP):
                 icmp_layer = packet[ICMP]
                 packet_info['protocol'] = 'ICMP'
                 packet_info['icmp_type'] = packet[ICMP].type
