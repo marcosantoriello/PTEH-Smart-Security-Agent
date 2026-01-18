@@ -52,7 +52,7 @@ class TrafficSniffer:
         self.print_statistics()
         sys.exit(0)
 
-    def notify_feature_extraction(self, filename, base_url='http://localhost:5000'):
+    def notify_feature_extraction(self, filename, base_url='http://172.21.0.3:5000'):
         """
         Notifies the feature extractor that a new pcap has been saved and 
         sends the path to this new file.
