@@ -123,7 +123,13 @@ services:
         ipv4_address: 172.20.0.10
     stdin_open: true
     tty: true
-    command: /bin/bash
+    cap_add:
+      - NET_ADMIN
+    command: >
+      bash -c "
+      ip route add 172.21.0.0/24 via 172.20.0.2 &&
+      /bin/bash
+      "
     volumes:
       - ./metasploit:/root/.msf4
     restart: unless-stopped
