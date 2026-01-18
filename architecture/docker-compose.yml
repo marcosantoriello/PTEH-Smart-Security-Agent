@@ -6,30 +6,36 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      internal_net:
+        ipv4_address: 172.21.0.2
 
-
-  traffic-sniffer:
+  firewall:
     build:
-      context: ./traffic-sniffer
+      context: ./firewall
       dockerfile: Dockerfile
-    container_name: traffic_sniffer
-    
-    network_mode: "host"
+    container_name: firewall
+    networks:
+      external_net:
+        ipv4_address: 172.20.0.2
+      internal_net:
+        ipv4_address: 172.21.0.5
     cap_add:
       - NET_ADMIN
       - NET_RAW
-    
+    sysctls:
+      - net.ipv4.ip_forward=1
     environment:
-      - SNIFFER_INTERFACE=docker0
-      - SNIFFER_COUNT=0
-    
+      - SNIFFER_INTERFACE=eth0 
+      - FEATURE_EXTRACTOR_URL=http://172.21.0.3:5000
     volumes:
-      - ./traffic-sniffer/logs:/app/logs
       - shared-pcap-data:/shared/pcap
+      - ./traffic-sniffer/sniffer:/app/sniffer
       - ./utils:/app/utils
-    
+      - ./firewall/logs:/app/logs
+    depends_on:
+      - feature-extractor
     restart: unless-stopped
-    
     logging:
       driver: "json-file"
       options:
@@ -41,19 +47,15 @@ services:
       context: ./feature-extractor
       dockerfile: Dockerfile
     container_name: feature_extractor
-    
-    network_mode: "host"
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    
+    networks:
+      internal_net:
+        ipv4_address: 172.21.0.3
+
     environment:
-      - REDIS_HOST=localhost
+      - REDIS_HOST=172.21.0.2
       - REDIS_PORT=6379
       - FLOW_TIMEOUT=120
       - ACTIVITY_TIMEOUT=5
-      - INTERFACE=docker0
-      # - PCAP_INPUT=/app/input/capture.pcap
 
     depends_on:
       - redis
@@ -64,9 +66,7 @@ services:
       - ./feature-extractor/config.json:/app/config.json
       - ./feature-extractor/logs:/app/logs
       - ./utils:/app/utils
-    
     restart: unless-stopped
-    
     logging:
       driver: "json-file"
       options:
@@ -78,11 +78,14 @@ services:
       context: ./ids
       dockerfile: Dockerfile
     container_name: ids
+    networks:
+      internal_net:
+        ipv4_address: 172.21.0.4
 
-    network_mode: "host"
+    
 
     environment:
-      - REDIS_HOST=localhost
+      - REDIS_HOST=172.21.0.2
       - REDIS_PORT=6379
       - POLLING_INTERVAL=10
 
@@ -103,7 +106,50 @@ services:
         max-size: "5m"
         max-file: "2"
 
-        
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: dvwa
+    networks:
+      internal_net:
+        ipv4_address: 172.21.0.10
+    restart: unless-stopped
+
+
+  metasploit:
+    image: metasploitframework/metasploit-framework
+    container_name: attacker
+    networks:
+      external_net:
+        ipv4_address: 172.20.0.10
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+    volumes:
+      - ./metasploit:/root/.msf4
+    restart: unless-stopped
+
 volumes:
   shared-pcap-data:
   redis_data:
+
+
+networks:
+  external_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-external
+
+
+  internal_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+          gateway: 172.21.0.1
+    driver_opts:
+      com.docker.network.bridge.name: br-internal
+          
