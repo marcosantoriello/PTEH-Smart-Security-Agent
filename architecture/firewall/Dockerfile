@@ -15,7 +15,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY firewall.py .
+COPY enforcer.py .
+COPY entrypoint.sh .
 
+RUN chmod +x entrypoint.sh
 RUN mkdir -p /app/logs /shared/pcap
 
-CMD ["python", "firewall.py"]
+CMD ["./entrypoint.sh"]
+
+

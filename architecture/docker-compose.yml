@@ -23,6 +23,8 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    ports:
+      - "5002:5002"
     sysctls:
       - net.ipv4.ip_forward=1
     environment:
