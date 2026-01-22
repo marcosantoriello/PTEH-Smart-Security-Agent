@@ -136,6 +136,27 @@ services:
       - ./metasploit:/root/.msf4
     restart: unless-stopped
 
+
+ai_agent:
+  build: ./modules/ai_agent
+  container_name: ai_agent
+  networks:
+    - internal_net
+  depends_on:
+    - redis
+    - firewall
+  environment:
+    - REDIS_HOST=172.21.0.2
+    - REDIS_PORT=6379
+    - OLLAMA_HOST=http://host.docker.internal:11434
+    - POLLING_INTERVAL=15
+    - FIREWALL_URL=http://firewall:5002/apply_rule
+  extra_hosts:
+    - "host.docker.internal:host-gateway"  # to access Ollama on the host
+  restart: unless-stopped
+
+
+
 volumes:
   shared-pcap-data:
   redis_data:
