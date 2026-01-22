@@ -118,9 +118,8 @@ def list_rules():
             capture_output=True,
             timeout=5
         )
-        return jsonify({
-            'rules': result.stdout.decode()
-        }), 200
+        return result.stdout.decode(), 200, {'Content-Type': 'text/plain'}
+    
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
