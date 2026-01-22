@@ -114,6 +114,8 @@ services:
     networks:
       internal_net:
         ipv4_address: 172.21.0.10
+    ports:
+      - "8080:80"
     restart: unless-stopped
 
 
