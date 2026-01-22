@@ -109,7 +109,7 @@ def apply_firewall_rule():
         'rule': rule
     }), 200 if success else 500
 
-@app.route('/list_rules', methods=['GET'])
+@app.route('/list-rules', methods=['GET'])
 def list_rules():
     """Endpoint to retrieve current rules"""
     try:
