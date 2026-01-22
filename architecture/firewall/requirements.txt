@@ -1,3 +1,4 @@
 scapy==2.5.0
 python-dateutil==2.8.2
 requests==2.32.5
+Flask==3.1.2
