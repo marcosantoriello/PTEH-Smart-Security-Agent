@@ -29,10 +29,8 @@ class SecurityAgent:
 
     
     def _connect_to_redis(self):
-        """
-            Connect to Redis and retrieve last timestamp (if any)
-        """
-        self.logger.info("Connecting to Redis and retrieving last timestamp (if any)...")
+        """Connect to Redis"""
+        self.logger.info("Connecting to Redis...")
         try:
             self.redis_client = redis.Redis(
                 host=self.REDIS_HOST, 
@@ -41,15 +39,6 @@ class SecurityAgent:
             )
             self.redis_client.ping()
             self.logger.info(f"Successfully connected to Redis at {self.REDIS_HOST}:{self.REDIS_PORT}")
-
-            last_processed = self.redis_client.zrevrange("features_index", 0, 0, withscores=True)
-
-            if not last_processed:
-                self.last_processed_timestamp = None
-                self.logger.info("Couldn't find the last processed timestamp")
-            else:
-                self.last_processed_timestamp = last_processed[0][1]
-                self.logger.info(f"Last processed timestamp found. Resuming from {self.last_processed_timestamp=}")
         except Exception as e:
             self.logger.error(f"Failed to connect to Redis: {e}")
     
@@ -131,14 +120,19 @@ class SecurityAgent:
             - Destination Port: {attack['dst_port']}
             - Protocol: {attack['protocol']}
 
+            NETWORK CONTEXT:
+            The firewall routes traffic between external network (attacker) and internal network (protected services).
+            Traffic passes THROUGH the firewall, not TO the firewall.
+
             REQUIREMENTS:
             1. Generate ONLY the iptables command (no explanations before/after)
             2. Use appropriate action (DROP for volumetric attacks, REJECT for others)
-            3. Be specific to the source IP and attack type
-            4. Use correct iptables syntax
+            3. Use FORWARD chain (not INPUT - traffic is routed through firewall)
+            4. Be specific to the source IP and attack type
+            5. Use correct iptables syntax
 
-            EXAMPLE FORMAT:
-            iptables -A INPUT -s <IP> -p <protocol> --dport <port> -j DROP
+            GENERIC EXAMPLE FORMAT (this is very generic, so you don't need to strictly follow it):
+            iptables -A FORWARD -s <IP> -p <protocol> --dport <port> -j DROP
 
             Your iptables rule:"""
 
