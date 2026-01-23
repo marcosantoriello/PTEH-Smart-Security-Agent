@@ -170,7 +170,7 @@ class SecurityAgent:
                 model=self.OLLAMA_MODEL,
                 prompt=prompt,
                 options={
-                    'temperature': 0.1,
+                    'temperature': 0.1, # low value to reduce randomness
                     'top_p': 0.9,
                 }
             )
