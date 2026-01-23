@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import subprocess
 import re
+import shlex
 from utils import get_logger
 from datetime import datetime
 
@@ -20,7 +21,7 @@ def validate_syntax(rule: str) -> tuple[bool,str]:
         return False, "Invalid iptables syntax pattern"
     
     # Input sanitization
-    blacklist = ['rm', 'dd', '&&', '||', ';', '`', '$']
+    blacklist = ['&&', '||', ';', '|', '\n', '\r', '`', '$(', ')']
     if any(cmd in rule for cmd in blacklist):
         return False, "Characters not allowed detected"
     
@@ -50,7 +51,7 @@ def apply_rule(rule: str) -> tuple[bool, str]:
     """Apply the rule"""
     try:
         result = subprocess.run(
-            rule.split(),
+            shlex.split(rule),
             capture_output=True,
             timeout=10
         )
