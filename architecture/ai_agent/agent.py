@@ -139,7 +139,6 @@ class SecurityAgent:
 
 
 
-
     def fetch_new_attacks(self) -> List[Dict]:
         """Retrieves new attacks from Redis"""
         try:
@@ -167,6 +166,31 @@ class SecurityAgent:
             self.logger.error(f"Error fetching attacks: {e}")
             return []
 
+
+    def _retrieve_examples(self, attack_type: str):
+        """
+        Retrieve relevant firewall rule examples from the knowledge base
+        
+        :param attack_type: attack type from the IDS
+
+        :return: List of metadata dictionaries containing rule examples
+        """
+
+        query_string = f"{attack_type} mitigation"
+
+        self.logger.info(f"Retrieving examples for: {attack_type}")
+
+        results = self.collection.query(
+            query_texts=[query_string], 
+            n_results=1
+        )
+
+        if results["metadatas"] and results['metadatas'][0]:
+            examples = results['metadatas'][0]
+            self.logger.info(f"Retrieved {len(examples)} examples")
+            return examples
+        else:
+            return []
 
 
     def _build_prompt(self, attack: Dict) -> str:
