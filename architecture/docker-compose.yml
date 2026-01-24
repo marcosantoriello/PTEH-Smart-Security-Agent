@@ -23,6 +23,8 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    ports:
+      - "5002:5002"
     sysctls:
       - net.ipv4.ip_forward=1
     environment:
@@ -78,11 +80,10 @@ services:
       context: ./ids
       dockerfile: Dockerfile
     container_name: ids
+
     networks:
       internal_net:
         ipv4_address: 172.21.0.4
-
-    
 
     environment:
       - REDIS_HOST=172.21.0.2
@@ -112,6 +113,8 @@ services:
     networks:
       internal_net:
         ipv4_address: 172.21.0.10
+    ports:
+      - "8080:80"
     restart: unless-stopped
 
 
@@ -125,6 +128,7 @@ services:
     tty: true
     cap_add:
       - NET_ADMIN
+      - NET_RAW
     command: >
       bash -c "
       ip route add 172.21.0.0/24 via 172.20.0.2 &&
@@ -133,6 +137,31 @@ services:
     volumes:
       - ./metasploit:/root/.msf4
     restart: unless-stopped
+
+
+  ai_agent:
+    build: ./ai_agent
+    container_name: ai_agent
+    networks:
+      - internal_net
+    depends_on:
+      - redis
+      - firewall
+    environment:
+      - REDIS_HOST=172.21.0.2
+      - REDIS_PORT=6379
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - POLLING_INTERVAL=10
+      - FIREWALL_URL=http://firewall:5002/apply-rule
+      - OLLAMA_MODEL=llama3:latest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # to access Ollama on the host
+    volumes:
+      - ./ai_agent/logs:/app/logs
+      - ./utils:/app/utils
+    restart: unless-stopped
+
+
 
 volumes:
   shared-pcap-data:

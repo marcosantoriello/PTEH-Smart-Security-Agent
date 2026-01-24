@@ -5,8 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY agent.py .
 
 RUN mkdir -p /app/logs
 
-CMD ["python", "ids.py"]
+CMD ["python", "agent.py"]
