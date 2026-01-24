@@ -154,11 +154,14 @@ services:
       - POLLING_INTERVAL=10
       - FIREWALL_URL=http://firewall:5002/apply-rule
       - OLLAMA_MODEL=llama3:latest
+      - CHROMADB_PERSIST_DIR=/app/chroma_db
+      - RAG_KNOWLEDGE_PATH=/app/knowledge_base/iptables_rules.json
     extra_hosts:
       - "host.docker.internal:host-gateway"  # to access Ollama on the host
     volumes:
       - ./ai_agent/logs:/app/logs
       - ./utils:/app/utils
+      - chroma_data:/app/chroma_db
     restart: unless-stopped
 
 

@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import List, Dict
 import requests
 from ollama import Client
+import chromadb
 
 class SecurityAgent:
     def __init__(self):
@@ -17,14 +18,16 @@ class SecurityAgent:
         self.OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://host.docker.internal:11434')
         self.FIREWALL_URL = os.getenv('FIREWALL_URL', 'http://firewall:5002/apply-rule')
         self.OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3:latest')
+        self.CHROMADB_PERSIST_DIR = os.getenv('CHROMADB_PERSIST_DIR', '/app/chroma_db')
+        self.RAG_KNOWLEDGE_PATH = os.getenv('RAG_KNOWLEDGE_PATH', '/app/knowledge_base/iptables_rules.json')
 
         self.redis_client = None
         self.ollama_client = None
         self.last_processed_ts = None
+        self.chroma_client = None
+        self.collection = None
 
         self.logger = get_logger('SecurityAgent')
-
-
 
 
     
@@ -41,7 +44,34 @@ class SecurityAgent:
             self.logger.info(f"Successfully connected to Redis at {self.REDIS_HOST}:{self.REDIS_PORT}")
         except Exception as e:
             self.logger.error(f"Failed to connect to Redis: {e}")
-    
+
+
+    def _setup_knowledge_base(self):
+        """
+        Load iptables rules from the knowledge document and populates ChromaDB collection.
+        """
+
+        
+        self.chroma_client = chromadb.PersistentClient(path=self.CHROMADB_PERSIST_DIR)
+
+        self.collection = self.chroma_client.get_or_create_collection(name="iptables_rules")
+
+        # checking if the collection existed already or has just been created
+        if self.collection.count() > 0:
+            self.logger.info(f"Loaded existing collection")
+            return
+        
+        # if the collection is empty, then I have to populate it
+        self.logger.info("Collection empty, loading from JSON...")
+
+        with open(self.RAG_KNOWLEDGE_PATH, 'r') as f:
+            knowledge_data = json.load()
+            
+
+
+        
+
+
 
     def setup(self):
         """
