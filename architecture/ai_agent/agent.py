@@ -65,12 +65,41 @@ class SecurityAgent:
         self.logger.info("Collection empty, loading from JSON...")
 
         with open(self.RAG_KNOWLEDGE_PATH, 'r') as f:
-            knowledge_data = json.load()
+            knowledge_data = json.load(f)
+
+        documents = []
+        metadatas = []
+        ids = []
+
+        try:
+            rules = knowledge_data["rules"]
             
+            for index, entry in enumerate(rules):
+                attack_type = entry["attack_type"]
+                description = entry["description"]
+                rule = entry["rule"]
+                reasoning = entry["reasoning"]
+
+                documents.append(f"{attack_type}: {description}")
+                metadatas.append({
+                    'attack_type': attack_type,
+                    'description': description,
+                    'rule': rule,
+                    'reasoning': reasoning
+                })
+                ids.append(f"rule_{index}")
+
+                self.collection.add(
+                    documents=documents,
+                    metadatas=metadatas,
+                    ids=ids
+                )
+                self.logger.info(f"Knowledge base loaded: {len(rules)} rules indexed")
 
 
-        
-
+        except KeyError as e:
+            self.logger.error(e)
+            raise
 
 
     def setup(self):
@@ -81,6 +110,7 @@ class SecurityAgent:
             - Retrieve last timestamp from Redis
             - Set the model
             - Set the Ollama client
+            - Set RAG knowledge base
         """
         self.logger.info("="*60)
         self.logger.info("Security Agent starting...")
@@ -89,6 +119,7 @@ class SecurityAgent:
 
         self.ollama_client = Client(host=self.OLLAMA_HOST)
         self.last_processed_ts = self._get_last_timestamp()
+        self._setup_knowledge_base()
 
 
 
