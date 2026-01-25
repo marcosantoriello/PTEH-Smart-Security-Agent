@@ -4,7 +4,7 @@ import json
 import time
 from utils import get_logger
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 import requests
 from ollama import Client
 import chromadb
@@ -18,7 +18,6 @@ class SecurityAgent:
         self.OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://host.docker.internal:11434')
         self.FIREWALL_URL = os.getenv('FIREWALL_URL', 'http://firewall:5002/apply-rule')
         self.OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3:latest')
-        self.CHROMADB_PERSIST_DIR = os.getenv('CHROMADB_PERSIST_DIR', '/app/chroma_db')
         self.RAG_KNOWLEDGE_PATH = os.getenv('RAG_KNOWLEDGE_PATH', '/app/knowledge_base/iptables_rules.json')
 
         self.redis_client = None
@@ -52,7 +51,7 @@ class SecurityAgent:
         """
 
         
-        self.chroma_client = chromadb.PersistentClient(path=self.CHROMADB_PERSIST_DIR)
+        self.chroma_client = chromadb.Client()
 
         self.collection = self.chroma_client.get_or_create_collection(name="iptables_rules")
 
@@ -193,8 +192,9 @@ class SecurityAgent:
             return []
 
 
-    def _build_prompt(self, attack: Dict) -> str:
-        """Builds structured prompt for LLM"""
+    def _build_prompt(self, attack: Dict, examples: Optional[List[dict]]=None) -> str:
+        """Builds structured prompt for LLM. If any example is provided, then include it."""
+        
         prompt = f"""You are a cybersecurity expert. Generate a precise iptables firewall rule to mitigate this attack.
             ATTACK DETAILS:
             - Type: {attack['prediction']}
@@ -215,11 +215,15 @@ class SecurityAgent:
             3. Use FORWARD chain (not INPUT - traffic is routed through firewall)
             4. Be specific to the source IP and attack type
             5. Use correct iptables syntax
-
-            GENERIC EXAMPLE FORMAT (this is very generic, so you don't need to strictly follow it):
-            iptables -A FORWARD -s <IP> -p <protocol> --dport <port> -j DROP
-
-            Your iptables rule:"""
+            """
+        
+        if examples:
+            prompt += "\nVALIDATED EXAMPLE:\n"
+            for ex in examples:
+                prompt += f"Rule: {ex['rule']}\n"
+                prompt += f"Reasoning: {ex['reasoning']}\n"
+                
+        prompt += "Your iptables rule:"
 
         return prompt
     
@@ -242,7 +246,14 @@ class SecurityAgent:
 
     def generate_rule(self, attack: Dict) -> Dict:
         """Generates firewall rule using LLM"""
-        prompt = self._build_prompt(attack)
+
+        examples = self._retrieve_examples(attack['prediction'])
+        if not examples:
+            prompt = self._build_prompt(attack)
+            rag_used=False # debug ------- REMOVE IT
+        else: # REMOVE IT
+            prompt = self._build_prompt(attack, examples)
+            rag_used = True
 
         try:
             response = self.ollama_client.generate(
@@ -264,7 +275,9 @@ class SecurityAgent:
                 'reasoning': f"Mitigating {attack['prediction']} from {attack['src_ip']}",
                 'attack_data': attack,
                 'confidence': attack['confidence'],
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'rag_used': rag_used,
+                'rag_examples': [ex['attack_type'] for ex in examples] if examples else []
             }
 
         except Exception as e:
