@@ -119,7 +119,8 @@ services:
 
 
   metasploit:
-    image: metasploitframework/metasploit-framework
+    #image: metasploitframework/metasploit-framework
+    build: ./metasploit
     container_name: attacker
     networks:
       external_net:
@@ -134,8 +135,6 @@ services:
       ip route add 172.21.0.0/24 via 172.20.0.2 &&
       /bin/bash
       "
-    volumes:
-      - ./metasploit:/root/.msf4
     restart: unless-stopped
 
 
