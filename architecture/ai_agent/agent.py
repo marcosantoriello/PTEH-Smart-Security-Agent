@@ -250,10 +250,15 @@ class SecurityAgent:
         examples = self._retrieve_examples(attack['prediction'])
         if not examples:
             prompt = self._build_prompt(attack)
-            rag_used=False # debug ------- REMOVE IT
-        else: # REMOVE IT
+            rag_used=False
+        else:
+            self.logger.info(f"RAG Example Retrieved:")
+            self.logger.info(f"  - Attack Type: {examples[0]['attack_type']}")
+            self.logger.info(f"  - Rule Template: {examples[0]['rule']}")
+            self.logger.info(f"  - Reasoning: {examples[0]['reasoning']}")
             prompt = self._build_prompt(attack, examples)
             rag_used = True
+
 
         try:
             response = self.ollama_client.generate(
