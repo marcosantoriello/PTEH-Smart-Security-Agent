@@ -18,6 +18,7 @@ class SecurityAgent:
         self.OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://host.docker.internal:11434')
         self.FIREWALL_URL = os.getenv('FIREWALL_URL', 'http://firewall:5002/apply-rule')
         self.OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3:latest')
+        self.CHROMADB_PERSIST_DIR = os.getenv('CHROMADB_PERSIST_DIR', '/app/chroma_db')
         self.RAG_KNOWLEDGE_PATH = os.getenv('RAG_KNOWLEDGE_PATH', '/app/knowledge_base/iptables_rules.json')
 
         self.redis_client = None
@@ -51,7 +52,7 @@ class SecurityAgent:
         """
 
         
-        self.chroma_client = chromadb.Client()
+        self.chroma_client = chromadb.PersistentClient(path=self.CHROMADB_PERSIST_DIR)
 
         self.collection = self.chroma_client.get_or_create_collection(name="iptables_rules")
 
