@@ -88,7 +88,7 @@ services:
     environment:
       - REDIS_HOST=172.21.0.2
       - REDIS_PORT=6379
-      - POLLING_INTERVAL=10
+      - POLLING_INTERVAL=5
 
     depends_on:
       - redis
@@ -151,9 +151,10 @@ services:
       - REDIS_HOST=172.21.0.2
       - REDIS_PORT=6379
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - POLLING_INTERVAL=10
+      - POLLING_INTERVAL=5
       - FIREWALL_URL=http://firewall:5002/apply-rule
       - OLLAMA_MODEL=llama3:latest
+      - RAG_KNOWLEDGE_PATH=/app/knowledge_base/iptables_rules.json
     extra_hosts:
       - "host.docker.internal:host-gateway"  # to access Ollama on the host
     volumes:

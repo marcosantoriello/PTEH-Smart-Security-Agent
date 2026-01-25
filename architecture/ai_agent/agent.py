@@ -4,9 +4,10 @@ import json
 import time
 from utils import get_logger
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 import requests
 from ollama import Client
+import chromadb
 
 class SecurityAgent:
     def __init__(self):
@@ -17,14 +18,15 @@ class SecurityAgent:
         self.OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://host.docker.internal:11434')
         self.FIREWALL_URL = os.getenv('FIREWALL_URL', 'http://firewall:5002/apply-rule')
         self.OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3:latest')
+        self.RAG_KNOWLEDGE_PATH = os.getenv('RAG_KNOWLEDGE_PATH', '/app/knowledge_base/iptables_rules.json')
 
         self.redis_client = None
         self.ollama_client = None
         self.last_processed_ts = None
+        self.chroma_client = None
+        self.collection = None
 
         self.logger = get_logger('SecurityAgent')
-
-
 
 
     
@@ -41,7 +43,63 @@ class SecurityAgent:
             self.logger.info(f"Successfully connected to Redis at {self.REDIS_HOST}:{self.REDIS_PORT}")
         except Exception as e:
             self.logger.error(f"Failed to connect to Redis: {e}")
-    
+
+
+    def _setup_knowledge_base(self):
+        """
+        Load iptables rules from the knowledge document and populates ChromaDB collection.
+        """
+
+        
+        self.chroma_client = chromadb.Client()
+
+        self.collection = self.chroma_client.get_or_create_collection(name="iptables_rules")
+
+        # checking if the collection existed already or has just been created
+        if self.collection.count() > 0:
+            self.logger.info(f"Loaded existing collection")
+            return
+        
+        # if the collection is empty, then I have to populate it
+        self.logger.info("Collection empty, loading from JSON...")
+
+        with open(self.RAG_KNOWLEDGE_PATH, 'r') as f:
+            knowledge_data = json.load(f)
+
+        documents = []
+        metadatas = []
+        ids = []
+
+        try:
+            rules = knowledge_data["rules"]
+            
+            for index, entry in enumerate(rules):
+                attack_type = entry["attack_type"]
+                description = entry["description"]
+                rule = entry["rule"]
+                reasoning = entry["reasoning"]
+
+                documents.append(f"{attack_type}: {description}")
+                metadatas.append({
+                    'attack_type': attack_type,
+                    'description': description,
+                    'rule': rule,
+                    'reasoning': reasoning
+                })
+                ids.append(f"rule_{index}")
+
+                self.collection.add(
+                    documents=documents,
+                    metadatas=metadatas,
+                    ids=ids
+                )
+                self.logger.info(f"Knowledge base loaded: {len(rules)} rules indexed")
+
+
+        except KeyError as e:
+            self.logger.error(e)
+            raise
+
 
     def setup(self):
         """
@@ -51,6 +109,7 @@ class SecurityAgent:
             - Retrieve last timestamp from Redis
             - Set the model
             - Set the Ollama client
+            - Set RAG knowledge base
         """
         self.logger.info("="*60)
         self.logger.info("Security Agent starting...")
@@ -59,6 +118,7 @@ class SecurityAgent:
 
         self.ollama_client = Client(host=self.OLLAMA_HOST)
         self.last_processed_ts = self._get_last_timestamp()
+        self._setup_knowledge_base()
 
 
 
@@ -75,7 +135,6 @@ class SecurityAgent:
         except Exception as e:
             self.logger.warning(f"Could not retrieve last timestamp: {e}")
         return 0.0
-
 
 
 
@@ -107,9 +166,35 @@ class SecurityAgent:
             return []
 
 
+    def _retrieve_examples(self, attack_type: str):
+        """
+        Retrieve relevant firewall rule examples from the knowledge base
+        
+        :param attack_type: attack type from the IDS
 
-    def _build_prompt(self, attack: Dict) -> str:
-        """Builds structured prompt for LLM"""
+        :return: List of metadata dictionaries containing rule examples
+        """
+
+        query_string = f"{attack_type} mitigation"
+
+        self.logger.info(f"Retrieving examples for: {attack_type}")
+
+        results = self.collection.query(
+            query_texts=[query_string], 
+            n_results=1
+        )
+
+        if results["metadatas"] and results['metadatas'][0]:
+            examples = results['metadatas'][0]
+            self.logger.info(f"Retrieved {len(examples)} examples")
+            return examples
+        else:
+            return []
+
+
+    def _build_prompt(self, attack: Dict, examples: Optional[List[dict]]=None) -> str:
+        """Builds structured prompt for LLM. If any example is provided, then include it."""
+        
         prompt = f"""You are a cybersecurity expert. Generate a precise iptables firewall rule to mitigate this attack.
             ATTACK DETAILS:
             - Type: {attack['prediction']}
@@ -130,11 +215,15 @@ class SecurityAgent:
             3. Use FORWARD chain (not INPUT - traffic is routed through firewall)
             4. Be specific to the source IP and attack type
             5. Use correct iptables syntax
-
-            GENERIC EXAMPLE FORMAT (this is very generic, so you don't need to strictly follow it):
-            iptables -A FORWARD -s <IP> -p <protocol> --dport <port> -j DROP
-
-            Your iptables rule:"""
+            """
+        
+        if examples:
+            prompt += "\nVALIDATED EXAMPLE:\n"
+            for ex in examples:
+                prompt += f"Rule: {ex['rule']}\n"
+                prompt += f"Reasoning: {ex['reasoning']}\n"
+                
+        prompt += "Your iptables rule:"
 
         return prompt
     
@@ -157,7 +246,19 @@ class SecurityAgent:
 
     def generate_rule(self, attack: Dict) -> Dict:
         """Generates firewall rule using LLM"""
-        prompt = self._build_prompt(attack)
+
+        examples = self._retrieve_examples(attack['prediction'])
+        if not examples:
+            prompt = self._build_prompt(attack)
+            rag_used=False
+        else:
+            self.logger.info(f"RAG Example Retrieved:")
+            self.logger.info(f"  - Attack Type: {examples[0]['attack_type']}")
+            self.logger.info(f"  - Rule Template: {examples[0]['rule']}")
+            self.logger.info(f"  - Reasoning: {examples[0]['reasoning']}")
+            prompt = self._build_prompt(attack, examples)
+            rag_used = True
+
 
         try:
             response = self.ollama_client.generate(
@@ -179,7 +280,9 @@ class SecurityAgent:
                 'reasoning': f"Mitigating {attack['prediction']} from {attack['src_ip']}",
                 'attack_data': attack,
                 'confidence': attack['confidence'],
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'rag_used': rag_used,
+                'rag_examples': [ex['attack_type'] for ex in examples] if examples else []
             }
 
         except Exception as e:

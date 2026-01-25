@@ -1,0 +1,88 @@
+{
+  "rules": [
+    {
+      "attack_type": "Port_Scan",
+      "description": "Attacker systematically scanning multiple ports from single source IP",
+      "rule": "iptables -A FORWARD -s {src_ip} -j DROP",
+      "reasoning": "Blocks ALL traffic from scanner IP, not individual ports. Prevents hundreds of redundant rules."
+    },
+    {
+      "attack_type": "DoS_Slowloris",
+      "description": "Slow HTTP attack keeping many connections open with incomplete requests",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp --dport 80 -m connlimit --connlimit-above 20 -j REJECT --reject-with tcp-reset",
+      "reasoning": "Rate limits concurrent connections to 20. REJECT closes connections gracefully for slow attacks."
+    },
+    {
+      "attack_type": "DoS_Slowhttptest",
+      "description": "Slow HTTP POST attack sending data at very slow rate",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp --dport 80 -m connlimit --connlimit-above 15 -j REJECT --reject-with tcp-reset",
+      "reasoning": "Lower limit (15) for POST attacks. Rate limiting preferred over full block."
+    },
+    {
+      "attack_type": "DoS_Hulk",
+      "description": "High-volume HTTP GET flood using multiple user agents",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp -m multiport --dports 80,443 -j DROP",
+      "reasoning": "Volumetric attack requires immediate full block of HTTP/HTTPS traffic."
+    },
+    {
+      "attack_type": "DoS_GoldenEye",
+      "description": "High-volume HTTP flood targeting application layer",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp -m multiport --dports 80,443 -j DROP",
+      "reasoning": "Volumetric HTTP flood requires immediate blocking."
+    },
+    {
+      "attack_type": "DDoS_LOIT",
+      "description": "Distributed DoS using LOIC tool from multiple sources",
+      "rule": "iptables -A FORWARD -s {src_ip} -j DROP",
+      "reasoning": "LOIC floods require complete traffic block. Block all protocols immediately."
+    },
+    {
+      "attack_type": "FTP-Patator",
+      "description": "Brute force attack on FTP service",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp --dport 21 -j DROP",
+      "reasoning": "Block FTP access from brute force source."
+    },
+    {
+      "attack_type": "SSH-Patator",
+      "description": "Brute force attack on SSH service",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp --dport 22 -j DROP",
+      "reasoning": "Block SSH access from brute force source."
+    },
+    {
+      "attack_type": "Botnet_ARES",
+      "description": "Botnet command and control communication",
+      "rule": "iptables -A FORWARD -s {src_ip} -j DROP",
+      "reasoning": "Complete block of botnet traffic. Bidirectional blocking needed but enforcer applies per-direction."
+    },
+    {
+      "attack_type": "Web_XSS",
+      "description": "Cross-Site Scripting attack via web application",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp -m multiport --dports 80,443 -j DROP",
+      "reasoning": "Block web traffic from XSS attack source."
+    },
+    {
+      "attack_type": "Web_SQL_Injection",
+      "description": "SQL Injection attack via web input",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp -m multiport --dports 80,443 -j DROP",
+      "reasoning": "Block web access from SQL injection source."
+    },
+    {
+      "attack_type": "Web_Brute_Force",
+      "description": "Automated brute force on web application login",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp -m multiport --dports 80,443 -j DROP",
+      "reasoning": "Block web access from brute force source."
+    },
+    {
+      "attack_type": "Heartbleed",
+      "description": "OpenSSL vulnerability exploitation via TLS heartbeat",
+      "rule": "iptables -A FORWARD -s {src_ip} -p tcp --dport 443 -j DROP",
+      "reasoning": "Block HTTPS from exploit source. Critical vulnerability requires immediate blocking."
+    },
+    {
+      "attack_type": "DoS_Generic",
+      "description": "Generic volumetric Denial of Service attack",
+      "rule": "iptables -A FORWARD -s {src_ip} -j DROP",
+      "reasoning": "Full traffic block for unclassified DoS. Catch-all for volumetric attacks."
+    }
+  ]
+}
