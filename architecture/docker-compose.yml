@@ -150,7 +150,7 @@ services:
       - REDIS_HOST=172.21.0.2
       - REDIS_PORT=6379
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - POLLING_INTERVAL=5
+      - POLLING_INTERVAL=1
       - FIREWALL_URL=http://firewall:5002/apply-rule
       - OLLAMA_MODEL=llama3:latest
       - CHROMADB_PERSIST_DIR=/app/chroma_db

@@ -139,32 +139,37 @@ class SecurityAgent:
 
 
 
-    def fetch_new_attacks(self) -> List[Dict]:
-        """Retrieves new attacks from Redis"""
+    def fetch_new_attacks(self) -> tuple[List[Dict], List[str]]:
+        """Retrieves new attacks from Redis
+        
+        Returns:
+            tuple: (attacks, processed_keys) - List of attack dicts and list of Redis keys processed
+        """
         try:
             keys = self.redis_client.zrangebyscore(
                 'attacks_index',
-                self.last_processed_ts,
+                f"({self.last_processed_ts}",  # Exclude last processed timestamp
                 '+inf',
                 start=0,
                 num=10  # Max 10 attacks per batch
             )
             
             if not keys:
-                return []
+                return [], []
             
             attacks = []
             for key in keys:
+                self.logger.info(f"Processing prediction file: {key}")
                 data = self.redis_client.get(key)
                 if data:
                     attacks.extend(json.loads(data))
             
-            self.logger.info(f"Fetched {len(attacks)} new attacks")
-            return attacks
+            self.logger.info(f"Fetched {len(attacks)} new attacks from {len(keys)} file(s)")
+            return attacks, keys
             
         except Exception as e:
             self.logger.error(f"Error fetching attacks: {e}")
-            return []
+            return [], []
 
 
     def _retrieve_examples(self, attack_type: str):
@@ -353,7 +358,7 @@ class SecurityAgent:
 
         while True:
             try:
-                attacks = self.fetch_new_attacks()
+                attacks, processed_keys = self.fetch_new_attacks()
 
                 if not attacks:
                     self.logger.debug(f"No new attacks, waiting {self.POLLING_INTERVAL}s")
@@ -369,10 +374,12 @@ class SecurityAgent:
 
                     self.validate_and_apply_rule(rule_data)
 
-                if attacks:
-                    self.last_processed_ts = max(
-                    float(a.get('timestamp', 0)) for a in attacks
-                )
+                # Update timestamp based on the highest score of processed Redis keys
+                if processed_keys:
+                    scores = self.redis_client.zmscore('attacks_index', processed_keys)
+                    max_score = max(float(s) for s in scores if s is not None)
+                    self.last_processed_ts = max_score
+                    self.logger.info(f"Updated last_processed_ts to {max_score}")
                     
             except KeyboardInterrupt:
                 self.logger.info("Received shutdown signal, stopping agent...")
