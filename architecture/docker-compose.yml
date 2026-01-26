@@ -161,6 +161,7 @@ services:
       - ./ai_agent/logs:/app/logs
       - ./utils:/app/utils
       - chroma_data:/app/chroma_db
+      - chroma_cache:/root/.cache/chroma
     restart: unless-stopped
 
 
@@ -169,6 +170,7 @@ volumes:
   shared-pcap-data:
   redis_data:
   chroma_data:
+  chroma_cache:
 
 
 networks:
