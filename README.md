@@ -179,7 +179,13 @@ ollama serve
 **3. Setup NTLFlowLyzer and fix a typo (required)**
 
 ```bash
+# From the root of the repo, execute
+git submodule update --init --recursive
 cd architecture/feature-extractor/libs/NTLFlowLyzer
+```
+
+```bash
+git fetch --tags
 git checkout v0.1.0
 
 # Apply fix automatically
