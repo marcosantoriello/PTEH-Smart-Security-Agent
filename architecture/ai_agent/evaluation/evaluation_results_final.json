@@ -1,0 +1,28 @@
+{
+  "per_attack_type": {
+    "Port_Scan": {
+      "correct": 934,
+      "wrong": 89,
+      "total": 1023,
+      "accuracy": 0.9130009775171065
+    },
+    "DDoS_LOIT": {
+      "correct": 1554,
+      "wrong": 0,
+      "total": 1554,
+      "accuracy": 1.0
+    },
+    "DoS_Hulk": {
+      "correct": 1,
+      "wrong": 0,
+      "total": 1,
+      "accuracy": 1.0
+    }
+  },
+  "overall": {
+    "correct": 2489,
+    "wrong": 89,
+    "total": 2578,
+    "accuracy": 0.965477114041893
+  }
+}
