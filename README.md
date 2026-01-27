@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 ![Keywords](https://img.shields.io/badge/Keywords-Cybersecurity%20%7C%20AI%20%7C%20RAG%20%7C%20LLM%20%7C%20IDS-0078D4)
-> **⚠️ EXPERIMENTAL RESEARCH PROJECT**  
+> **⚠️ RESEARCH PROJECT**  
 > Developed as part of the "Penetration Testing and Ethical Hacking" course at University of Salerno, this project explores the feasibility of using Large Language Models for automated security policy generation.
 
 ## 📋 Table of Contents
