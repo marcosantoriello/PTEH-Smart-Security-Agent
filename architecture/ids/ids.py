@@ -160,7 +160,7 @@ class Ids:
                      f"({self.last_processed_timestamp}",
                     "+inf",
                 )
-            self.logger.info(f"Found {len(file_keys)} new file(s) in chronological order")
+            self.logger.info(f"Found {len(file_keys)} new file(s)")
             return file_keys
         except Exception as e:
             self.logger.error(f"Failed to retrieve new files keys: {e}")
