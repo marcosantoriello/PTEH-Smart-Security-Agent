@@ -102,15 +102,16 @@ class Ids:
             Retrieve new files from Redis in batches and merge them.
 
             Returns:
-                pandas.DataFrame: a DataFrame containing the combined data from the new files.
+                tuple: (pandas.DataFrame, list) - DataFrame with combined data and list of successfully processed keys
         """
         retrieved_file_keys = self._get_new_files_keys()
 
         if not retrieved_file_keys:
             self.logger.info("No new files to retrieve")
-            return None
+            return None, []
 
         dataframes = []
+        successfully_processed_keys = []
 
         for key in retrieved_file_keys:
             try:
@@ -122,6 +123,7 @@ class Ids:
                 
                 df = pd.read_csv(io.StringIO(csv_content))
                 dataframes.append(df)
+                successfully_processed_keys.append(key)
                 self.logger.info(f"Loaded {len(df)} rows from {key}")
             
             except Exception as e:
@@ -130,21 +132,21 @@ class Ids:
         
         if not dataframes:
             self.logger.warning("No valid files were loaded")
-            return None
+            return None, []
         
         combined_df = pd.concat(dataframes, ignore_index=True)
         self.logger.info(f"Successfully merged {len(dataframes)} file(s) into DataFrame with {len(combined_df)} rows")
         
-        return combined_df
+        return combined_df, successfully_processed_keys
             
         
 
     def _get_new_files_keys(self):
         """
-            Retrieve the keys of new files from Redis.
+            Retrieve the keys of new files from Redis in timestamp order.
 
             Returns:
-                list: a list of Redis keys representing the files to process.
+                list: a list of Redis keys representing the files to process, sorted by timestamp (ascending).
         """
         try:
             if self.last_processed_timestamp is None:
@@ -158,7 +160,7 @@ class Ids:
                      f"({self.last_processed_timestamp}",
                     "+inf",
                 )
-            self.logger.info(f"Found {len(file_keys)} new file(s)")
+            self.logger.info(f"Found {len(file_keys)} new file(s) in chronological order")
             return file_keys
         except Exception as e:
             self.logger.error(f"Failed to retrieve new files keys: {e}")
@@ -367,7 +369,7 @@ if __name__ == "__main__":
 
     while True:
         try:
-            df = ids._get_new_files()
+            df, processed_keys = ids._get_new_files()
 
             if df is None:
                 ids.logger.info("No data to preprocess.")
@@ -379,8 +381,8 @@ if __name__ == "__main__":
                 predictions = ids._predict(X_scaled, df_clean)
 
                 ids._save_predictions(predictions)
-                file_keys = ids._get_new_files_keys()
-                ids._update_last_processed_timestamp(file_keys)
+                # Update timestamp only with keys that were successfully processed
+                ids._update_last_processed_timestamp(processed_keys)
 
         
         except Exception as e:

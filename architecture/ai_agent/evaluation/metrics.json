@@ -1,0 +1,72 @@
+{
+  "Port_Scan": {
+    "must_have": ["-s", "-j DROP", "FORWARD"],
+    "must_not_have": ["--dport", "--sport"],
+    "description": "Must block entire source IP, not specific ports"
+  },
+  "DoS_Hulk": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block source IP"
+  },
+  "DoS_Slowloris": {
+    "must_have": ["-s", "connlimit", "-j REJECT"],
+    "must_not_have": [],
+    "description": "Must rate limit connections using connlimit"
+  },
+  "DoS_Slowhttptest": {
+    "must_have": ["-s", "connlimit"],
+    "must_not_have": [],
+    "description": "Must rate limit connections, similar to Slowloris"
+  },
+  "DoS_GoldenEye": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block HTTP/HTTPS traffic from source"
+  },
+  "DDoS_LOIT": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must completely block DDoS participant"
+  },
+  "FTP-Patator": {
+    "must_have": ["-s", "21", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block FTP access (port 21)"
+  },
+  "SSH-Patator": {
+    "must_have": ["-s", "22", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block SSH access (port 22)"
+  },
+  "Botnet_ARES": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must completely isolate botnet traffic"
+  },
+  "Web_XSS": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block web traffic from attacker"
+  },
+  "Web_SQL_Injection": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block web traffic from attacker"
+  },
+  "Web_Brute_Force": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block web access from source"
+  },
+  "Heartbleed": {
+    "must_have": ["-s", "443", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block HTTPS from exploit source"
+  },
+  "DoS_Generic": {
+    "must_have": ["-s", "-j DROP"],
+    "must_not_have": [],
+    "description": "Must block all traffic for generic DoS"
+  }
+}
