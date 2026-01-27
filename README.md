@@ -154,7 +154,7 @@ The AI Agent was evaluated on **2,578 generated rules** across 3 attack types:
 
 ```bash
 git clone https://github.com/marcosantoriello/PTEH-Smart-IDS-Firewall-Agent.git
-cd <PTEH-Smart-IDS-Firewall-Agent>
+cd ./PTEH-Smart-IDS-Firewall-Agent
 ```
 
 **2. Install and configure Ollama**
